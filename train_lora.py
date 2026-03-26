@@ -207,6 +207,7 @@ def main():
     vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse")
     vae.requires_grad_(False)
     vae.eval()
+    vae = vae.to(dtype=weight_dtype)  # match input dtype (bf16/fp16) to avoid type mismatch
 
     noise_scheduler = DDIMScheduler.from_pretrained(
         args.base_ckpt, subfolder="scheduler"
