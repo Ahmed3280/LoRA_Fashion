@@ -131,8 +131,12 @@ def main():
     # ── Apply LoRA weights ────────────────────────────────────────────────────
     print(f"Loading LoRA weights from: {args.lora_weights}")
     from peft import PeftModel
+    from model.attn_processor import SkipAttnProcessor
+    from model.utils import init_adapter
     pipeline.unet = PeftModel.from_pretrained(pipeline.unet, args.lora_weights)
     pipeline.unet = pipeline.unet.merge_and_unload()   # fuse LoRA into weights for faster inference
+    # Re-apply SkipAttnProcessor — merge_and_unload() resets attention processors
+    init_adapter(pipeline.unet, cross_attn_cls=SkipAttnProcessor)
     pipeline.unet.eval()
     print("LoRA weights merged.")
 
