@@ -58,6 +58,8 @@ def parse_args():
     p.add_argument("--mixed_precision", default="bf16",
                    choices=["no", "fp16", "bf16"])
     p.add_argument("--seed",         type=int, default=42)
+    p.add_argument("--no_automasker", action="store_true",
+                   help="Skip AutoMasker and use pre-existing masks in agnostic-mask/")
     return p.parse_args()
 
 
@@ -136,7 +138,7 @@ def main():
 
     # ── Load AutoMasker (for pairs without pre-generated masks) ───────────────
     mask_dir = test_data / "agnostic-mask"
-    need_automasker = not mask_dir.exists() or not any(mask_dir.iterdir())
+    need_automasker = (not args.no_automasker) and (not mask_dir.exists() or not any(mask_dir.iterdir()))
     if need_automasker:
         print("No pre-generated masks found — loading AutoMasker ...")
         automasker = AutoMasker(
