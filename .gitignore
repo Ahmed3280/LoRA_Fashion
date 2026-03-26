@@ -12,3 +12,15 @@ densepose_
 playground.py
 output
 model/cloth_masker_segformer.py
+
+# Dataset images (upload separately to RunPod, do not commit)
+train/image/
+train/cloth/
+train/agnostic-mask/
+
+# Windows conda env (Linux-incompatible, too large)
+environment.yml
+
+# Test artifacts
+test_inputs/
+test_outputs/

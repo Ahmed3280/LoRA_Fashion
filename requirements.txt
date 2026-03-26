@@ -1,7 +1,7 @@
 torch==2.4.0
 torchvision==0.19.0 
 accelerate==0.31.0
-git+https://github.com/huggingface/diffusers.git
+diffusers==0.29.2
 matplotlib==3.9.1
 numpy==1.26.4
 opencv_python==4.10.0.84
