@@ -208,19 +208,23 @@ def main():
         )
         output_img = result[0]   # PIL Image
 
-        # Save: side-by-side (person | cloth | result)
+        stem = Path(person_name).stem
+
+        # Save try-on result only
+        output_img.save(out_dir / f"{stem}_result.jpg", quality=95)
+
+        # Save comparison (person | cloth | result) for reference
         person_resized = resize_and_crop(person_img, size)
         cloth_resized  = resize_and_padding(cloth_img, size)
         canvas = Image.new("RGB", (args.width * 3, args.height))
         canvas.paste(person_resized, (0, 0))
         canvas.paste(cloth_resized,  (args.width, 0))
         canvas.paste(output_img,     (args.width * 2, 0))
-
-        stem = Path(person_name).stem
-        canvas.save(out_dir / f"{stem}_result.jpg", quality=95)
+        canvas.save(out_dir / f"{stem}_compare.jpg", quality=95)
 
     print(f"\nDone! Results saved to: {out_dir}")
-    print(f"Layout: [original person] | [garment] | [try-on result]")
+    print(f"  *_result.jpg  — try-on output only")
+    print(f"  *_compare.jpg — [person | garment | result] side-by-side")
 
 
 if __name__ == "__main__":
