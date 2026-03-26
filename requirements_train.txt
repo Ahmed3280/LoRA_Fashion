@@ -1,0 +1,35 @@
+# requirements_train.txt — RunPod / cloud GPU training environment
+# ---------------------------------------------------------------
+# DO NOT include torch/torchvision here.
+# RunPod base images ship with CUDA-enabled torch already installed.
+# pip install torch==x.x.x from PyPI would replace it with a CPU-only build.
+#
+# Usage on RunPod:
+#   pip install -r requirements_train.txt
+# ---------------------------------------------------------------
+
+# Core diffusion stack
+diffusers==0.29.2
+transformers==4.46.3
+accelerate==0.31.0
+peft>=0.17.0
+huggingface_hub>=0.34.0,<2.0
+safetensors
+
+# Vision / data
+numpy==1.26.4
+pillow==10.3.0
+opencv-python==4.10.0.84
+scipy==1.13.1
+scikit-image==0.24.0
+
+# DensePose / AutoMasker deps (needed by prepare_dataset.py)
+fvcore==0.1.5.post20221221
+cloudpickle==3.0.0
+omegaconf==2.3.0
+pycocotools==2.0.8
+PyYAML==6.0.1
+
+# Utilities
+tqdm==4.66.4
+matplotlib==3.9.1

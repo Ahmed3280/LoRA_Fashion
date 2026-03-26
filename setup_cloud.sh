@@ -26,24 +26,10 @@ apt-get install -y -q zip unzip git wget curl
 # ── 2. Python packages ────────────────────────────────────────────────────────
 echo ""
 echo "[2/5] Installing Python packages ..."
-pip install --quiet \
-    diffusers==0.29.2 \
-    transformers==4.46.3 \
-    accelerate==0.31.0 \
-    "peft>=0.17.0" \
-    "huggingface_hub>=0.34.0,<2.0" \
-    opencv-python==4.10.0.84 \
-    pillow==10.3.0 \
-    scipy==1.13.1 \
-    scikit-image==0.24.0 \
-    numpy==1.26.4 \
-    tqdm==4.66.4 \
-    omegaconf==2.3.0 \
-    fvcore==0.1.5.post20221221 \
-    cloudpickle==3.0.0 \
-    pycocotools==2.0.8 \
-    PyYAML==6.0.1 \
-    gradio==4.41.0
+# NOTE: torch/torchvision are intentionally excluded — the RunPod base image
+# ships with CUDA-enabled torch. Installing from PyPI would replace it with
+# a CPU-only build and break training.
+pip install --quiet -r requirements_train.txt
 
 # ── 3. Detectron2 (required by DensePose) ────────────────────────────────────
 echo ""
@@ -100,12 +86,12 @@ echo "           --cloth_type   overall"
 echo ""
 echo "  4. Run training:"
 echo "       python train_lora.py \\"
-echo "           --data_root       /workspace/data/mena \\"
+echo "           --data_root       /workspace/CatVTON \\"
 echo "           --output_dir      /workspace/output/lora_mena \\"
 echo "           --cloth_type      overall \\"
-echo "           --height          512 \\"
-echo "           --width           384 \\"
-echo "           --batch_size      2 \\"
-echo "           --num_epochs      30 \\"
+echo "           --height          1024 \\"
+echo "           --width           768 \\"
+echo "           --batch_size      1 \\"
+echo "           --num_epochs      20 \\"
 echo "           --mixed_precision bf16"
 echo "=============================================="
