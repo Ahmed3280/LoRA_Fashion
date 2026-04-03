@@ -263,7 +263,8 @@ def main():
 
     # ── Optimizer (LoRA params only) ──────────────────────────────────────
     trainable_params = [p for p in unet.parameters() if p.requires_grad]
-    optimizer = torch.optim.AdamW(trainable_params, lr=args.lr,
+    import bitsandbytes.optim as bnb_optim
+    optimizer = bnb_optim.AdamW8bit(trainable_params, lr=args.lr,
                                   betas=(0.9, 0.999), weight_decay=1e-2)
 
     # ── Prepare with Accelerator ──────────────────────────────────────────
