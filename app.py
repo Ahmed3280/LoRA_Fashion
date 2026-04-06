@@ -170,6 +170,8 @@ def submit_function(
         mask=mask,
         num_inference_steps=num_inference_steps,
         guidance_scale=guidance_scale,
+        height=args.height,
+        width=args.width,
         generator=generator
     )[0]
     # except Exception as e:
