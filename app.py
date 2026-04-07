@@ -126,7 +126,9 @@ def submit_function(
     num_inference_steps,
     guidance_scale,
     seed,
-    show_type
+    show_type,
+    width,
+    height,
 ):
     person_image, mask = person_image["background"], person_image["layers"][0]
     mask = Image.open(mask).convert("L")
@@ -149,12 +151,12 @@ def submit_function(
 
     person_image = Image.open(person_image).convert("RGB")
     cloth_image = Image.open(cloth_image).convert("RGB")
-    person_image = resize_and_crop(person_image, (args.width, args.height))
-    cloth_image = resize_and_padding(cloth_image, (args.width, args.height))
-    
+    person_image = resize_and_crop(person_image, (width, height))
+    cloth_image = resize_and_padding(cloth_image, (width, height))
+
     # Process mask
     if mask is not None:
-        mask = resize_and_crop(mask, (args.width, args.height))
+        mask = resize_and_crop(mask, (width, height))
     else:
         mask = automasker(
             person_image,
@@ -170,8 +172,8 @@ def submit_function(
         mask=mask,
         num_inference_steps=num_inference_steps,
         guidance_scale=guidance_scale,
-        height=args.height,
-        width=args.width,
+        height=height,
+        width=width,
         generator=generator
     )[0]
     # except Exception as e:
@@ -274,6 +276,10 @@ def app_gradio():
                 gr.Markdown(
                     '<span style="color: #808080; font-size: small;">Advanced options can adjust details:<br>1. `Inference Step` may enhance details;<br>2. `CFG` is highly correlated with saturation;<br>3. `Random seed` may improve pseudo-shadow.</span>'
                 )
+                with gr.Row():
+                    width = gr.Number(label="Width", value=768, precision=0)
+                    height = gr.Number(label="Height", value=1024, precision=0)
+
                 with gr.Accordion("Advanced Options", open=False):
                     num_inference_steps = gr.Slider(
                         label="Inference Step", minimum=10, maximum=100, step=5, value=50
@@ -365,6 +371,8 @@ def app_gradio():
                     guidance_scale,
                     seed,
                     show_type,
+                    width,
+                    height,
                 ],
                 result_image,
             )
