@@ -200,43 +200,44 @@ def _save_pairs_file(path: Path, pairs: list[tuple[str, str]]):
             f.write(f"{person_name} {cloth_name}\n")
 
 
-@torch.no_grad()
-def _compute_batch_loss(vae: AutoencoderKL, unet, noise_scheduler, batch, weight_dtype: torch.dtype):
-    gt = batch["gt"].to(weight_dtype)
-    masked_person = batch["masked_person"].to(weight_dtype)
-    cloth = batch["cloth"].to(weight_dtype)
-    mask = batch["mask"].to(weight_dtype)
+def _compute_batch_loss(vae: AutoencoderKL, unet, noise_scheduler, batch, weight_dtype: torch.dtype, require_grad: bool):
+    context = torch.enable_grad() if require_grad else torch.no_grad()
+    with context:
+        gt = batch["gt"].to(weight_dtype)
+        masked_person = batch["masked_person"].to(weight_dtype)
+        cloth = batch["cloth"].to(weight_dtype)
+        mask = batch["mask"].to(weight_dtype)
 
-    gt_latent = encode(vae, gt)
-    masked_latent = encode(vae, masked_person)
-    cloth_latent = encode(vae, cloth)
+        gt_latent = encode(vae, gt)
+        masked_latent = encode(vae, masked_person)
+        cloth_latent = encode(vae, cloth)
 
-    h, w = gt_latent.shape[-2], gt_latent.shape[-1]
-    mask_latent = F.interpolate(mask, size=(h, w), mode="nearest")
+        h, w = gt_latent.shape[-2], gt_latent.shape[-1]
+        mask_latent = F.interpolate(mask, size=(h, w), mode="nearest")
 
-    noise = torch.randn_like(gt_latent)
-    timesteps = torch.randint(
-        0,
-        noise_scheduler.config.num_train_timesteps,
-        (gt_latent.shape[0],),
-        device=gt_latent.device,
-    ).long()
-    noisy_gt = noise_scheduler.add_noise(gt_latent, noise, timesteps)
+        noise = torch.randn_like(gt_latent)
+        timesteps = torch.randint(
+            0,
+            noise_scheduler.config.num_train_timesteps,
+            (gt_latent.shape[0],),
+            device=gt_latent.device,
+        ).long()
+        noisy_gt = noise_scheduler.add_noise(gt_latent, noise, timesteps)
 
-    noisy_concat = torch.cat([noisy_gt, cloth_latent], dim=-2)
-    mask_concat = torch.cat([mask_latent, torch.zeros_like(mask_latent)], dim=-2)
-    masked_concat = torch.cat([masked_latent, cloth_latent], dim=-2)
-    unet_input = torch.cat([noisy_concat, mask_concat, masked_concat], dim=1)
+        noisy_concat = torch.cat([noisy_gt, cloth_latent], dim=-2)
+        mask_concat = torch.cat([mask_latent, torch.zeros_like(mask_latent)], dim=-2)
+        masked_concat = torch.cat([masked_latent, cloth_latent], dim=-2)
+        unet_input = torch.cat([noisy_concat, mask_concat, masked_concat], dim=1)
 
-    noise_pred = unet(
-        unet_input,
-        timesteps,
-        encoder_hidden_states=None,
-        return_dict=False,
-    )[0]
-    noise_pred_person = noise_pred.split(noise_pred.shape[-2] // 2, dim=-2)[0]
-    loss = F.mse_loss(noise_pred_person.float(), noise.float(), reduction="mean")
-    return loss
+        noise_pred = unet(
+            unet_input,
+            timesteps,
+            encoder_hidden_states=None,
+            return_dict=False,
+        )[0]
+        noise_pred_person = noise_pred.split(noise_pred.shape[-2] // 2, dim=-2)[0]
+        loss = F.mse_loss(noise_pred_person.float(), noise.float(), reduction="mean")
+        return loss
 
 
 def main():
@@ -363,14 +364,13 @@ def main():
 
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
-                loss = _compute_batch_loss(vae, unet, noise_scheduler, batch, weight_dtype)
-
-            accelerator.backward(loss)
-            if accelerator.sync_gradients:
-                accelerator.clip_grad_norm_(trainable_params, 1.0)
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
+                loss = _compute_batch_loss(vae, unet, noise_scheduler, batch, weight_dtype, require_grad=True)
+                accelerator.backward(loss)
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(trainable_params, 1.0)
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
 
             epoch_loss += loss.item()
             if accelerator.is_main_process and step % 50 == 0:
@@ -385,12 +385,16 @@ def main():
             val_sum = 0.0
             val_n = 0
             for batch in val_dataloader:
-                vloss = _compute_batch_loss(vae, unet, noise_scheduler, batch, weight_dtype)
+                vloss = _compute_batch_loss(vae, unet, noise_scheduler, batch, weight_dtype, require_grad=False)
                 bs = batch["gt"].shape[0]
                 stats = torch.tensor([vloss.detach().float() * bs, bs], device=vloss.device)
                 stats = accelerator.gather_for_metrics(stats)
-                val_sum += stats[:, 0].sum().item()
-                val_n += int(stats[:, 1].sum().item())
+                if stats.ndim == 1:
+                    val_sum += stats[0].item()
+                    val_n += int(stats[1].item())
+                else:
+                    val_sum += stats[:, 0].sum().item()
+                    val_n += int(stats[:, 1].sum().item())
             val_loss = val_sum / max(1, val_n)
             if accelerator.is_main_process:
                 print(f"Epoch {epoch+1}/{args.num_epochs}  val_loss {val_loss:.6f}")

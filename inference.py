@@ -79,6 +79,19 @@ class DressCodeTestDataset(InferenceDataset):
                     'mask': os.path.join(self.args.data_root_path, sub_folder, 'agnostic_masks', person_img.replace('.jpg', '.png'))
                 })
         return data
+
+
+class SingleInputDataset(InferenceDataset):
+    def load_data(self):
+        for p in [self.args.person_image, self.args.garment_image, self.args.agnostic_mask]:
+            assert p is not None and os.path.exists(p), f"Input file not found: {p}"
+        person_name = os.path.basename(self.args.person_image)
+        return [{
+            "person_name": person_name,
+            "person": self.args.person_image,
+            "cloth": self.args.garment_image,
+            "mask": self.args.agnostic_mask,
+        }]
                     
        
 def parse_args():
@@ -102,15 +115,22 @@ def parse_args():
     parser.add_argument(
         "--dataset_name",
         type=str,
-        required=True,
-        help="The datasets to use for evaluation.",
+        default="single",
+        choices=["single", "vitonhd", "dresscode"],
+        help="Evaluation mode: direct single input or dataset mode.",
     )
     parser.add_argument(
-        "--data_root_path", 
-        type=str, 
-        required=True,
-        help="Path to the dataset to evaluate."
+        "--data_root_path",
+        type=str,
+        default=None,
+        help="Path to dataset root (required for vitonhd/dresscode modes)."
     )
+    parser.add_argument("--person_image", type=str, default=None,
+                        help="Path to person image (required in single mode).")
+    parser.add_argument("--garment_image", type=str, default=None,
+                        help="Path to garment image (required in single mode).")
+    parser.add_argument("--agnostic_mask", type=str, default=None,
+                        help="Path to agnostic mask image (required in single mode).")
     parser.add_argument(
         "--output_dir",
         type=str,
@@ -213,10 +233,19 @@ def parse_args():
         default=True,
         help="Whether or not to enable condition noise.",
     )
+    parser.add_argument(
+        "--attn_ckpt_version",
+        type=str,
+        default="mix",
+        choices=["mix", "vitonhd", "dresscode"],
+        help="Attention checkpoint version for CatVTON pipeline.",
+    )
     
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
-    if env_local_rank != -1 and env_local_rank != args.local_rank:
+    if not hasattr(args, "local_rank"):
+        args.local_rank = env_local_rank
+    elif env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
 
     return args
@@ -253,7 +282,7 @@ def main():
     args = parse_args()
     # Pipeline
     pipeline = CatVTONPipeline(
-        attn_ckpt_version=args.dataset_name,
+        attn_ckpt_version=args.attn_ckpt_version,
         attn_ckpt=args.resume_path,
         base_ckpt=args.base_model_path,
         weight_dtype={
@@ -265,12 +294,16 @@ def main():
         skip_safety_check=True
     )
     # Dataset
-    if args.dataset_name == "vitonhd":
+    if args.dataset_name == "single":
+        dataset = SingleInputDataset(args)
+    elif args.dataset_name == "vitonhd":
+        assert args.data_root_path is not None, "--data_root_path is required for vitonhd mode."
         dataset = VITONHDTestDataset(args)
     elif args.dataset_name == "dresscode":
+        assert args.data_root_path is not None, "--data_root_path is required for dresscode mode."
         dataset = DressCodeTestDataset(args)
     else:
-        raise ValueError(f"Invalid dataset name {args.dataset}.")
+        raise ValueError(f"Invalid dataset name {args.dataset_name}.")
     print(f"Dataset {args.dataset_name} loaded, total {len(dataset)} pairs.")
     dataloader = DataLoader(
         dataset,
@@ -280,7 +313,10 @@ def main():
     )
     # Inference
     generator = torch.Generator(device='cuda').manual_seed(args.seed)
-    args.output_dir = os.path.join(args.output_dir, f"{args.dataset_name}-{args.height}", "paired" if args.eval_pair else "unpaired")
+    if args.dataset_name == "single":
+        args.output_dir = os.path.join(args.output_dir, "single")
+    else:
+        args.output_dir = os.path.join(args.output_dir, f"{args.dataset_name}-{args.height}", "paired" if args.eval_pair else "unpaired")
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     for batch in tqdm(dataloader):
