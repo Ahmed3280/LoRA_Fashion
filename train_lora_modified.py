@@ -194,6 +194,12 @@ def _split_pairs(pairs: list[tuple[str, str]], val_split: float, seed: int):
     return train_pairs, val_pairs
 
 
+def _save_pairs_file(path: Path, pairs: list[tuple[str, str]]):
+    with open(path, "w", encoding="utf-8") as f:
+        for person_name, cloth_name in pairs:
+            f.write(f"{person_name} {cloth_name}\n")
+
+
 @torch.no_grad()
 def _compute_batch_loss(vae: AutoencoderKL, unet, noise_scheduler, batch, weight_dtype: torch.dtype):
     gt = batch["gt"].to(weight_dtype)
@@ -289,6 +295,10 @@ def main():
     train_pairs, val_pairs = _split_pairs(all_pairs, args.val_split, args.val_seed)
     if accelerator.is_main_process:
         print(f"Pairs: total={len(all_pairs)}  train={len(train_pairs)}  val={len(val_pairs)}  (val_split={args.val_split})")
+        split_dir = Path(args.output_dir)
+        _save_pairs_file(split_dir / "train_pairs_used.txt", train_pairs)
+        _save_pairs_file(split_dir / "val_pairs_used.txt", val_pairs)
+        print(f"Saved split files to: {split_dir}")
 
     train_dataset = VirtualTryOnDataset(
         data_root=args.data_root,
