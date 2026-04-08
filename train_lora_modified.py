@@ -376,6 +376,11 @@ def main():
                 lr = lr_scheduler.get_last_lr()[0] if hasattr(lr_scheduler, "get_last_lr") else args.lr
                 print(f"Epoch {epoch+1}/{args.num_epochs}  step {step}  loss {avg:.4f}  lr {lr:.2e}")
 
+        if accelerator.is_main_process:
+            train_loss = epoch_loss / len(train_dataloader)
+            lr = lr_scheduler.get_last_lr()[0] if hasattr(lr_scheduler, "get_last_lr") else args.lr
+            print(f"Epoch {epoch+1}/{args.num_epochs}  train_loss {train_loss:.6f}  lr {lr:.2e}")
+
         did_eval = False
         if val_dataloader is not None and args.eval_every > 0 and ((epoch + 1) % args.eval_every == 0):
             did_eval = True
