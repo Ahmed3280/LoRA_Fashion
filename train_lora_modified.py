@@ -36,7 +36,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 from accelerate import Accelerator
-from accelerate.utils import ProjectConfiguration
+from accelerate.utils import ProjectConfiguration, DistributedDataParallelKwargs
 from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
 from accelerate import load_checkpoint_in_model
@@ -180,17 +180,10 @@ def _load_pairs_file(path: Path) -> list[tuple[str, str]]:
 
 
 def _split_pairs(pairs: list[tuple[str, str]], val_split: float, seed: int):
-    if not (0.0 <= val_split < 1.0):
-        raise ValueError(f"--val_split must be in [0, 1), got {val_split}")
     if val_split <= 0:
         return pairs, []
     n = len(pairs)
     n_val = max(1, int(round(n * val_split)))
-    if n_val >= n:
-        raise ValueError(
-            f"val_split={val_split} leaves no training pairs "
-            f"(n={n}, n_val={n_val}). Use a smaller val_split."
-        )
     g = torch.Generator()
     g.manual_seed(seed)
     perm = torch.randperm(n, generator=g).tolist()
@@ -249,10 +242,12 @@ def main():
     args = parse_args()
 
     project_cfg = ProjectConfiguration(project_dir=args.output_dir)
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(
         mixed_precision=args.mixed_precision,
         project_config=project_cfg,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        kwargs_handlers=[ddp_kwargs],
     )
 
     if accelerator.is_main_process:
@@ -299,7 +294,6 @@ def main():
     pairs_path = Path(args.data_root) / "train" / "train_pairs.txt"
     all_pairs = _load_pairs_file(pairs_path)
     train_pairs, val_pairs = _split_pairs(all_pairs, args.val_split, args.val_seed)
-    assert len(train_pairs) > 0, "train set is empty after split — lower --val_split"
     if accelerator.is_main_process:
         print(f"Pairs: total={len(all_pairs)}  train={len(train_pairs)}  val={len(val_pairs)}  (val_split={args.val_split})")
         split_dir = Path(args.output_dir)
@@ -436,3 +430,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    
