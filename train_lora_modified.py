@@ -41,7 +41,7 @@ from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
 from accelerate import load_checkpoint_in_model
 from huggingface_hub import snapshot_download
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, PeftModel
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
@@ -166,6 +166,12 @@ def parse_args():
                    help="Accumulate gradients over N steps (effective batch = batch_size x N)")
     p.add_argument("--no_gradient_checkpointing", action="store_true",
                    help="Disable gradient checkpointing (uses more VRAM, trains faster)")
+    p.add_argument("--resume_from_checkpoint", type=str, default=None,
+                   help="Path to a saved LoRA adapter dir to resume from (e.g. output/lora_mena/best)")
+    p.add_argument("--start_epoch", type=int, default=0,
+                   help="Epoch to resume from (0-indexed). Set to the epoch that was completed last.")
+    p.add_argument("--resume_best_val", type=float, default=float("inf"),
+                   help="Best val_loss achieved before resuming (for early-stopping continuity)")
     return p.parse_args()
 
 
@@ -276,14 +282,19 @@ def main():
     if len(target_modules) == 0:
         raise ValueError("--lora_target_modules must contain at least one module name")
 
-    lora_config = LoraConfig(
-        r=args.lora_rank,
-        lora_alpha=args.lora_alpha,
-        target_modules=target_modules,
-        lora_dropout=args.lora_dropout,
-        bias="none",
-    )
-    unet = get_peft_model(unet, lora_config)
+    if args.resume_from_checkpoint:
+        unet = PeftModel.from_pretrained(unet, args.resume_from_checkpoint, is_trainable=True)
+        if accelerator.is_main_process:
+            print(f"Resumed LoRA weights from: {args.resume_from_checkpoint}")
+    else:
+        lora_config = LoraConfig(
+            r=args.lora_rank,
+            lora_alpha=args.lora_alpha,
+            target_modules=target_modules,
+            lora_dropout=args.lora_dropout,
+            bias="none",
+        )
+        unet = get_peft_model(unet, lora_config)
     unet.print_trainable_parameters()
 
     if not args.no_gradient_checkpointing:
@@ -354,9 +365,17 @@ def main():
     else:
         unet, vae, optimizer, train_dataloader, lr_scheduler = prepared
 
-    best_val = float("inf")
+    # Fast-forward LR scheduler if resuming mid-training
+    if args.start_epoch > 0:
+        steps_to_skip = args.start_epoch * num_update_steps_per_epoch
+        for _ in range(steps_to_skip):
+            lr_scheduler.step()
+        if accelerator.is_main_process:
+            print(f"Resumed from epoch {args.start_epoch}, skipped {steps_to_skip} scheduler steps")
+
+    best_val = args.resume_best_val
     no_improve = 0
-    for epoch in range(args.num_epochs):
+    for epoch in range(args.start_epoch, args.num_epochs):
         unet.train()
         epoch_loss = 0.0
 
