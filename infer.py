@@ -37,9 +37,47 @@ def parse_args():
     p.add_argument("--width",        type=int, default=768)
     p.add_argument("--steps",        type=int, default=50)
     p.add_argument("--guidance",     type=float, default=2.5)
+    p.add_argument(
+        "--repaint", 
+        action="store_true", 
+        help="Whether to repaint the result image with the original background."
+    )
     p.add_argument("--seed",         type=int, default=42)
+    p.add_argument(
+        "--mixed_precision",
+        type=str,
+        default="bf16",
+        choices=["no", "fp16", "bf16"],
+        help=(
+            "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
+            " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
+            " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
+        ),
+    )
+    p.add_argument(
+        "--repaint", 
+        action="store_true", 
+        help="Whether to repaint the result image with the original background."
+    )
+    p.add_argument(
+        "--concat_eval_results",
+        action="store_true",
+        help="Whether or not to  concatenate the all conditions into one image.",
+    )
     return p.parse_args()
 
+def repaint(person, mask, result):
+    _, h = result.size
+    kernal_size = h // 50
+    if kernal_size % 2 == 0:
+        kernal_size += 1
+    mask = mask.filter(ImageFilter.GaussianBlur(kernal_size))
+    person_np = np.array(person)
+    result_np = np.array(result)
+    mask_np = np.array(mask) / 255
+    repaint_result = person_np * (1 - mask_np) + result_np * mask_np
+    repaint_result = Image.fromarray(repaint_result.astype(np.uint8))
+    return repaint_result
 
 def main():
     args = parse_args()
@@ -56,7 +94,11 @@ def main():
         base_ckpt=args.base_ckpt,
         attn_ckpt=args.attn_ckpt,
         attn_ckpt_version="mix",
-        weight_dtype=torch.bfloat16,
+        weight_dtype={
+            "no": torch.float32,
+            "fp16": torch.float16,
+            "bf16": torch.bfloat16,
+        }[args.mixed_precision],
         device=device,
         skip_safety_check=True,
     )
@@ -142,7 +184,28 @@ def main():
             width=args.width,
             generator=generator,
         )[0]
-
+        if args.concat_eval_results or args.repaint:
+            person_images = to_pil_image(person_images)
+            cloth_images = to_pil_image(cloth_images)
+            masks = to_pil_image(masks)
+        for i, result in enumerate(results):
+            person_name = batch['person_name'][i]
+            output_path = os.path.join(args.output_dir, person_name)
+            if not os.path.exists(os.path.dirname(output_path)):
+                os.makedirs(os.path.dirname(output_path))
+            if args.repaint:
+                person_path, mask_path = dataset.data[batch['index'][i]]['person'], dataset.data[batch['index'][i]]['mask']
+                person_image= Image.open(person_path).resize(result.size, Image.LANCZOS)
+                mask = Image.open(mask_path).resize(result.size, Image.NEAREST)
+                result = repaint(person_image, mask, result)
+            if args.concat_eval_results:
+                w, h = result.size
+                concated_result = Image.new('RGB', (w*3, h))
+                concated_result.paste(person_images[i], (0, 0))
+                concated_result.paste(cloth_images[i], (w, 0))  
+                concated_result.paste(result, (w*2, 0))
+                result = concated_result
+            result.save(output_path)
         stem = Path(person_name).stem
         result.save(out_dir / f"{stem}_result.jpg", quality=95)
 
