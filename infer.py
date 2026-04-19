@@ -73,7 +73,20 @@ def repaint(person, mask, result):
     repaint_result = person_np * (1 - mask_np) + result_np * mask_np
     repaint_result = Image.fromarray(repaint_result.astype(np.uint8))
     return repaint_result
-
+    
+def to_pil_image(images):
+    images = (images / 2 + 0.5).clamp(0, 1)
+    images = images.cpu().permute(0, 2, 3, 1).float().numpy()
+    if images.ndim == 3:
+        images = images[None, ...]
+    images = (images * 255).round().astype("uint8")
+    if images.shape[-1] == 1:
+        # special case for grayscale (single channel) images
+        pil_images = [Image.fromarray(image.squeeze(), mode="L") for image in images]
+    else:
+        pil_images = [Image.fromarray(image) for image in images]
+    return pil_images
+    
 def main():
     args = parse_args()
     test_data = Path(args.test_data)
