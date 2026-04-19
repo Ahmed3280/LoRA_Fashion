@@ -192,7 +192,7 @@ def main():
             width=args.width,
             generator=generator,
         )[0]
-        if args.concat_eval_results or args.repaint:
+        ''' if args.concat_eval_results or args.repaint:
             person_images = to_pil_image(person_images)
             cloth_images = to_pil_image(cloth_images)
             masks = to_pil_image(masks)
@@ -212,7 +212,7 @@ def main():
                 concated_result.paste(person_images[i], (0, 0))
                 concated_result.paste(cloth_images[i], (w, 0))  
                 concated_result.paste(result, (w*2, 0))
-                result = concated_result
+                result = concated_result '''
             result.save(output_path)
         stem = Path(person_name).stem
         result.save(out_dir / f"{stem}_result.jpg", quality=95)
