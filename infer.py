@@ -37,11 +37,6 @@ def parse_args():
     p.add_argument("--width",        type=int, default=768)
     p.add_argument("--steps",        type=int, default=50)
     p.add_argument("--guidance",     type=float, default=2.5)
-    p.add_argument(
-        "--repaint", 
-        action="store_true", 
-        help="Whether to repaint the result image with the original background."
-    )
     p.add_argument("--seed",         type=int, default=42)
     p.add_argument(
         "--mixed_precision",
