@@ -212,8 +212,8 @@ def main():
                 concated_result.paste(person_images[i], (0, 0))
                 concated_result.paste(cloth_images[i], (w, 0))  
                 concated_result.paste(result, (w*2, 0))
-                result = concated_result '''
-            result.save(output_path)
+                result = concated_result 
+            result.save(output_path)'''
         stem = Path(person_name).stem
         result.save(out_dir / f"{stem}_result.jpg", quality=95)
 
