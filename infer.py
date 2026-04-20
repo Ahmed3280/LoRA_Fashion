@@ -293,7 +293,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()"""
+    main()
+    
+    """
 Batch inference using fine-tuned CatVTON (LoRA weights)
 ========================================================
 Usage:
