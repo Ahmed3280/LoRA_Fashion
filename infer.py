@@ -191,20 +191,21 @@ def main():
             mask_imgs.append(mask_img)
             person_names.append(person_name)
 
-        # Run inference on the batch
-        results = pipeline(
-            image=person_imgs if len(person_imgs) > 1 else person_imgs[0],
-            condition_image=cloth_imgs if len(cloth_imgs) > 1 else cloth_imgs[0],
-            mask=mask_imgs if len(mask_imgs) > 1 else mask_imgs[0],
-            num_inference_steps=args.steps,
-            guidance_scale=args.guidance,
-            height=args.height,
-            width=args.width,
-            generator=generator,
-        )
-        # Normalise to list
-        if not isinstance(results, list):
-            results = [results]
+        # Run inference one image at a time (pipeline expects single PIL images)
+        results = []
+        for person_img, cloth_img, mask_img in zip(person_imgs, cloth_imgs, mask_imgs):
+            result = pipeline(
+                image=person_img,
+                condition_image=cloth_img,
+                mask=mask_img,
+                num_inference_steps=args.steps,
+                guidance_scale=args.guidance,
+                height=args.height,
+                width=args.width,
+                generator=generator,
+            )
+            # pipeline may return a list or a single image
+            results.append(result[0] if isinstance(result, list) else result)
 
         for i, result in enumerate(results):
             person_name = person_names[i]
