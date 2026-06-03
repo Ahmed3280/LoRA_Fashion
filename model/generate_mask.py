@@ -189,7 +189,7 @@ def clean_mask(mask_uint8, min_region_size=500):
     filled = cv2.morphologyEx(
         mask_uint8,
         cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (12, 12)),
         iterations=1,
     )
 
@@ -368,13 +368,13 @@ def generate_mask(image_path, cloth_type, output_path):
 
     face_excl_dilated = cv2.dilate(
         raw_face_excl,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)),
         iterations=1,
     )
 
     limb_excl_dilated = cv2.dilate(
         raw_limb_excl,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
         iterations=1,
     )
 
