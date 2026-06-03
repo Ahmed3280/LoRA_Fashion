@@ -368,13 +368,13 @@ def generate_mask(image_path, cloth_type, output_path):
 
     face_excl_dilated = cv2.dilate(
         raw_face_excl,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
         iterations=1,
     )
 
     limb_excl_dilated = cv2.dilate(
         raw_limb_excl,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
         iterations=1,
     )
 
