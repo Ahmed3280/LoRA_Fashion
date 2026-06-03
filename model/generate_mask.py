@@ -189,7 +189,7 @@ def clean_mask(mask_uint8, min_region_size=500):
     filled = cv2.morphologyEx(
         mask_uint8,
         cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (12, 12)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
         iterations=1,
     )
 
@@ -202,7 +202,7 @@ def clean_mask(mask_uint8, min_region_size=500):
 
     dilated = cv2.dilate(
         opened,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
         iterations=1,
     )
 
