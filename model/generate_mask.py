@@ -200,8 +200,14 @@ def clean_mask(mask_uint8, min_region_size=500):
         iterations=1,
     )
 
-    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+    dilated = cv2.dilate(
         opened,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+        iterations=1,
+    )
+
+    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+        dilated,
         connectivity=8
     )
 
